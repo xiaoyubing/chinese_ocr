@@ -2,7 +2,7 @@ from keras.models import Model
 from keras.layers.core import Dense, Dropout, Activation, Reshape, Permute
 from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D
 from keras.layers.pooling import AveragePooling2D, GlobalAveragePooling2D
-from keras.layers import Input, Flatten
+from keras.layers import Input, Flatten, Bidirectional, LSTM, GRU
 from keras.layers.merge import concatenate
 from keras.layers.normalization import BatchNormalization
 from keras.regularizers import l2
@@ -77,9 +77,48 @@ def dense_cnn(input, nclass):
 
     return y_pred
 
-def dense_blstm(input):
+def dense_blstm(input, nclass):
+    _dropout_rate = 0.2
+    _weight_decay = 1e-4
 
-    pass
+    _nb_filter = 64
+    # conv 64 5*5 s=2
+    x = Conv2D(_nb_filter, (5, 5), strides=(2, 2), kernel_initializer='he_normal', padding='same',
+               use_bias=False, kernel_regularizer=l2(_weight_decay))(input)
+
+    # 64 + 8 * 8 = 128
+    x, _nb_filter = dense_block(x, 8, _nb_filter, 8, None, _weight_decay)
+    # 128
+    x, _nb_filter = transition_block(x, 128, _dropout_rate, 2, _weight_decay)
+
+    # 128 + 8 * 8 = 192
+    x, _nb_filter = dense_block(x, 8, _nb_filter, 8, None, _weight_decay)
+    # 192 -> 128
+    x, _nb_filter = transition_block(x, 128, _dropout_rate, 2, _weight_decay)
+
+    # 128 + 8 * 8 = 192
+    x, _nb_filter = dense_block(x, 8, _nb_filter, 8, None, _weight_decay)
+
+    x = BatchNormalization(axis=-1, epsilon=1.1e-5)(x)
+    x = Activation('relu')(x)
+
+    # Permute层将输入的维度按照给定模式进行重排，例如，当需要将RNN和CNN网络连接时，可能会用到该层。
+    x = Permute((2, 1, 3), name='permute')(x)
+    x = TimeDistributed(Flatten(), name='flatten')(x)
+
+    rnnunit = 512
+    # cnn之后链接双向GRU，双向GRU会输出固定长度的序列，这是一个encode的过程，之后再连接一个双向GRU，对该序列进行解码
+    # 该序列的输出为长度为256的序列
+    # cnn之后连接双向GRU
+    x = Bidirectional(GRU(rnnunit, return_sequences=True, implementation=2), name='blstm1')(x)
+    x = Dense(rnnunit, name='blstm1_out', activation='linear')(x)
+    x = Bidirectional(GRU(rnnunit, return_sequences=True, implementation=2), name='blstm2')(x)
+    # x = Bidirectional(LSTM(rnnunit, return_sequences=True, implementation=2), name='blstm1')(x)
+    # x = Dense(rnnunit, name='blstm1_out', activation='linear')(x)
+    # x = Bidirectional(LSTM(rnnunit, return_sequences=True, implementation=2), name='blstm2')(x)
+    y_pred = Dense(nclass, name='out', activation='softmax')(x)
+
+    return y_pred
 
 input = Input(shape=(32, 280, 1), name='the_input')
 dense_cnn(input, 5000)

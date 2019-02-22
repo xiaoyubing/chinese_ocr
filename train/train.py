@@ -117,7 +117,8 @@ def ctc_lambda_func(args):
 
 def get_model(img_h, nclass):
     input = Input(shape=(img_h, None, 1), name='the_input')
-    y_pred = densenet.dense_cnn(input, nclass)
+    # y_pred = densenet.dense_cnn(input, nclass)
+    y_pred = densenet.dense_blstm(input, nclass)
 
     basemodel = Model(inputs=input, outputs=y_pred)
     basemodel.summary()
