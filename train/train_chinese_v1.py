@@ -20,14 +20,15 @@ from keras.layers.convolutional import Conv2D, MaxPooling2D, ZeroPadding2D
 from keras.optimizers import SGD, Adam
 from keras.models import Model
 from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler, TensorBoard
+from keras.utils.training_utils import multi_gpu_model
 
 from imp import reload
 import densenet
 
 img_h = 32
-img_w = 280*2
+img_w = 280
 batch_size = 64
-maxlabellength = 10*2
+maxlabellength = 10
 
 def get_session(gpu_fraction=1.0):
 
@@ -116,8 +117,8 @@ def ctc_lambda_func(args):
 
 def get_model(img_h, nclass):
     input = Input(shape=(img_h, None, 1), name='the_input')
-    y_pred = densenet.dense_cnn(input, nclass)
-    # y_pred = densenet.dense_blstm(input, nclass)
+    # y_pred = densenet.dense_cnn(input, nclass)
+    y_pred = densenet.dense_blstm(input, nclass)
 
     basemodel = Model(inputs=input, outputs=y_pred)
     basemodel.summary()
@@ -135,9 +136,10 @@ def get_model(img_h, nclass):
 
 
 if __name__ == '__main__':
-    # char_set = open('char_std_5990.txt', 'r', encoding='utf-8').readlines()
-    char_set = open('char_std_96_english_v1.txt', 'r', encoding='utf-8').readlines()
-    char_set = ''.join([ch.strip('\n') if ch.strip('\n')!='' else ' ' for ch in char_set][1:] + ['卍'])
+    char_set = open('char_std_5990.txt', 'r', encoding='utf-8').readlines()
+    char_set = ''.join([ch.strip('\n') for ch in char_set][1:] + ['卍'])
+    # char_set = open('char_std_96_english_v1.txt', 'r', encoding='utf-8').readlines()
+    # char_set = ''.join([ch.strip('\n') if ch.strip('\n')!='' else ' ' for ch in char_set][1:] + ['卍'])
     print('char_set:',char_set)
     nclass = len(char_set)
     print('~~~~~~~~~~~~nclass:',nclass)
@@ -146,7 +148,7 @@ if __name__ == '__main__':
     reload(densenet)
     basemodel, model = get_model(img_h, nclass)
 
-    modelPath = './models/weights_densenet_v2-08-2.77--.h5'
+    modelPath = './models/weights_densenet_chinese.h5'
     if os.path.exists(modelPath):
         print("Loading model weights...")
         model.load_weights(modelPath, by_name=True, skip_mismatch=True)
@@ -158,27 +160,28 @@ if __name__ == '__main__':
         basemodel.load_weights(basemodelPath, by_name=True, skip_mismatch=True)
         print('done!')
 
-    base_train_path = '/dockershare/hmbdata2/'
-    base_test_path = '/dockershare/hmbdata3/'
+    base_train_path = '/mnt/sdb/ocr/chinese_ocr_DataSet/Synthetic_Chinese_String_Dataset/'
+    base_validation_path = '/mnt/sdb/ocr/chinese_ocr_DataSet/Synthetic_Chinese_String_Dataset/'
 
-    train_loader = gen(base_train_path + 'total_label_0-100.txt', base_train_path, batchsize=batch_size, maxlabellength=maxlabellength, imagesize=(img_h, img_w))
-    test_loader = gen(base_test_path + 'total_label_0-100.txt', base_test_path, batchsize=batch_size, maxlabellength=maxlabellength, imagesize=(img_h, img_w))
+    # base_test_path = '/mnt/sdb/ocr/chinese_ocr_DataSet/Chinese_dataset/images/'
 
-    checkpoint = ModelCheckpoint(filepath='./models/weights_densenet_v3-{epoch:02d}-{val_loss:.2f}.h5', monitor='val_loss', save_best_only=False, save_weights_only=True)
+
+    train_loader = gen(base_train_path + 'data_train.txt', base_train_path + 'images/', batchsize=batch_size, maxlabellength=maxlabellength, imagesize=(img_h, img_w))
+    test_loader = gen(base_validation_path + 'data_test.txt', base_validation_path + 'images/', batchsize=batch_size, maxlabellength=maxlabellength, imagesize=(img_h, img_w))
+
+    checkpoint = ModelCheckpoint(filepath='./models/weights_densenet_chinese-{epoch:02d}-{val_loss:.2f}.h5', monitor='val_loss', save_best_only=False, save_weights_only=True)
     lr_schedule = lambda epoch: 0.0005 * 0.4**epoch
     learning_rate = np.array([lr_schedule(i) for i in range(10)])
     changelr = LearningRateScheduler(lambda epoch: float(learning_rate[epoch]))
     earlystop = EarlyStopping(monitor='val_loss', patience=2, verbose=1)
-    tensorboard = TensorBoard(log_dir='./models/logs', write_graph=True)
+    tensorboard = TensorBoard(log_dir='./models/chinese_logs', write_graph=True)
 
     print('-----------Start training-----------')
     model.fit_generator(train_loader,
-    	steps_per_epoch =  181999// batch_size,
+    	steps_per_epoch =  3607567// batch_size,
     	epochs = 150,
-    	initial_epoch = 8,
+    	initial_epoch = 0,
     	validation_data = test_loader,
-    	validation_steps = 181999 // batch_size,
-    	# callbacks = [checkpoint, changelr, tensorboard])
-    callbacks = [checkpoint, earlystop, changelr, tensorboard])
-
+    	validation_steps = 36440 // batch_size,
+    	callbacks = [checkpoint, earlystop, changelr, tensorboard])
 

@@ -23,6 +23,9 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateSchedule
 
 from imp import reload
 import densenet
+from keras.utils import multi_gpu_model
+
+GPU_NUM = 2
 
 img_h = 32
 img_w = 280*2
@@ -35,10 +38,18 @@ def get_session(gpu_fraction=1.0):
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction)
 
     if num_threads:
-        return tf.Session(config=tf.ConfigProto(
-            gpu_options=gpu_options, intra_op_parallelism_threads=num_threads))
+        if GPU_NUM > 1:
+            return tf.Session(config=tf.ConfigProto(
+                gpu_options=gpu_options, intra_op_parallelism_threads=num_threads, allow_soft_placement=True))
+        else:
+            return tf.Session(config=tf.ConfigProto(
+                gpu_options=gpu_options, intra_op_parallelism_threads=num_threads))
     else:
-        return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+        if GPU_NUM > 1:
+            return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+        else:
+            return tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True))
+
 
 def readfile(filename):
     res = []
@@ -129,6 +140,10 @@ def get_model(img_h, nclass):
     loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred, labels, input_length, label_length])
 
     model = Model(inputs=[input, labels, input_length, label_length], outputs=loss_out)
+
+    if GPU_NUM > 1:
+        model = multi_gpu_model(model, gpus=GPU_NUM)
+
     model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer='adam', metrics=['accuracy'])
 
     return basemodel, model
