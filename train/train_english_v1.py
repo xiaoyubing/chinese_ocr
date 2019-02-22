@@ -147,10 +147,16 @@ if __name__ == '__main__':
     reload(densenet)
     basemodel, model = get_model(img_h, nclass)
 
-    modelPath = './models/pretrain_model/weights_densenet.h5'
+    modelPath = './models/weights_densenet-03-2.51.h5'
     if os.path.exists(modelPath):
         print("Loading model weights...")
-        basemodel.load_weights(modelPath, by_name=True, skip_mismatch=True)
+        model.load_weights(modelPath, by_name=True, skip_mismatch=True)
+        print('done!')
+
+    basemodelPath = './models/pretrain_model/weights_densenet.h5'
+    if os.path.exists(basemodelPath) and not os.path.exists(modelPath):
+        print("Loading basemodelPath weights...")
+        basemodel.load_weights(basemodelPath, by_name=True, skip_mismatch=True)
         print('done!')
 
     base_train_path = '/dockershare/hmbdata1/'
@@ -169,7 +175,7 @@ if __name__ == '__main__':
     print('-----------Start training-----------')
     model.fit_generator(train_loader,
     	steps_per_epoch =  181999// batch_size,
-    	epochs = 10,
+    	epochs = 150,
     	initial_epoch = 0,
     	validation_data = test_loader,
     	validation_steps = 181999 // batch_size,
