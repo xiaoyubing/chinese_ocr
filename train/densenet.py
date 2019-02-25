@@ -106,7 +106,7 @@ def dense_blstm(input, nclass):
     x = Permute((2, 1, 3), name='permute')(x)
     x = TimeDistributed(Flatten(), name='flatten')(x)
 
-    rnnunit = 256   #在1080ti　11G显存上不能设置成512,否则无法进行训练OOM
+    rnnunit = 256   #在1080ti　11G显存上不能设置成512,否则无法进行训练OOM.
     # cnn之后链接双向GRU，双向GRU会输出固定长度的序列，这是一个encode的过程，之后再连接一个双向GRU，对该序列进行解码
     # 该序列的输出为长度为256的序列
     # cnn之后连接双向GRU
