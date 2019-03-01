@@ -48,6 +48,9 @@ python train.py
 | -----------| ---------- | -----------|
 | 0.983 | 8ms | 18.9MB |
 
+256 GRU:20756s 368ms/step - loss: 0.1004 - acc: 0.9919 - val_loss: 0.1509 - val_acc: 0.9891
+
+
 * GPU: GTX TITAN X
 * Keras Backend: Tensorflow
 
